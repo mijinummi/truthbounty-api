@@ -1,4 +1,5 @@
 import { Controller, Post, Param, Body, Get, Query, BadRequestException, ForbiddenException } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
 import { EvidenceFlagService } from './evidence-flag.service';
 
 class CreateFlagDto {
@@ -6,6 +7,7 @@ class CreateFlagDto {
   flaggedBy?: string;
 }
 
+@ApiTags('evidence')
 @Controller('evidence')
 export class EvidenceController {
   constructor(private readonly flagService: EvidenceFlagService) {}

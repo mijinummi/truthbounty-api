@@ -1,4 +1,5 @@
 import { Controller, Get, Post, Body, Logger } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { EventIndexerService } from './event-indexer.service';
 
 interface BackfillRequest {
@@ -10,6 +11,7 @@ interface BackfillRequest {
  * REST API for managing the event indexer
  * Provides endpoints for status, restart, and backfill operations
  */
+@ApiTags('indexer')
 @Controller('indexer')
 export class IndexerController {
   private logger = new Logger(IndexerController.name);

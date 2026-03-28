@@ -1,10 +1,12 @@
 import { Controller, Get, Post, Body, Param } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
 import { EventIndexingService } from './event-indexing.service';
 import { ReconciliationService } from './reconciliation.service';
 import { BlockchainStateService } from './state.service';
 import { WeightedVoteResolutionService } from './weighted-vote-resolution.service';
 import { BlockInfo, VerificationVote, ResolutionConfig } from './types';
 
+@ApiTags('blockchain')
 @Controller('api/v1/blockchain')
 export class BlockchainController {
   constructor(

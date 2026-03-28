@@ -1,7 +1,9 @@
 import { Controller, Get, Query, Param, UseInterceptors } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { AuditTrailService } from '../services/audit-trail.service';
 import { AuditLog, AuditActionType, AuditEntityType } from '../entities/audit-log.entity';
 
+@ApiTags('audit')
 @Controller('audit')
 export class AuditController {
   constructor(private readonly auditTrailService: AuditTrailService) {}
