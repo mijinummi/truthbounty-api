@@ -52,7 +52,7 @@ class ThrottlerMemoryStorage {
     const now = Date.now();
     const record = this.storage.get(key);
 
-    if (!record || record.expiresAt < now) {
+    if (!record) {
       const newRecord = {
         totalHits: 1,
         expiresAt: now + ttl,
@@ -82,7 +82,9 @@ class ThrottlerMemoryStorage {
           timeToBlockExpire: Math.max(record.blockExpiresAt - now, 0),
         };
       }
-    } else if (record.expiresAt <= now) {
+    }
+
+    if (record.expiresAt <= now) {
       record.totalHits = 1;
       record.expiresAt = now + ttl;
     } else {
