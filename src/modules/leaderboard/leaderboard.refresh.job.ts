@@ -1,42 +1,50 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { LeaderboardService } from './leaderboard.service';
 import { LEADERBOARD_REFRESH_CRON } from './leaderboard.constants';
+import { PrismaClient } from 'src/generated/client/client';
 
 @Injectable()
 export class LeaderboardRefreshJob {
+  private readonly logger = new Logger(LeaderboardRefreshJob.name);
+
   constructor(
     private readonly leaderboardService: LeaderboardService,
+    private readonly prisma: PrismaClient,
   ) {}
 
   @Cron(LEADERBOARD_REFRESH_CRON)
   async refreshLeaderboard() {
-    console.log('Refreshing leaderboards...');
+    this.logger.log('Refreshing leaderboards...');
 
-    // ⚠️ Replace this with real DB query
-    const usersFromDB = await this.fetchUsersFromDatabase();
+    const users = await this.fetchUsersFromDatabase();
+
+    if (users.length === 0) {
+      this.logger.warn('No users found, skipping leaderboard refresh.');
+      return;
+    }
 
     // Clear old rankings
     await this.leaderboardService.clearLeaderboard('global');
     await this.leaderboardService.clearLeaderboard('weekly');
 
-    // Rebuild rankings
-    for (const user of usersFromDB) {
-      await this.leaderboardService.updateScore(
-        user.id,
-        user.reputation,
-      );
+    // Rebuild rankings from real data
+    for (const user of users) {
+      await this.leaderboardService.updateScore(user.id, user.reputation);
     }
 
-    console.log('Leaderboard refreshed successfully');
+    this.logger.log(`Leaderboard refreshed with ${users.length} users.`);
   }
 
-  // Replace with actual DB call
-  private async fetchUsersFromDatabase() {
-    return [
-      { id: 'user1', reputation: 150 },
-      { id: 'user2', reputation: 300 },
-      { id: 'user3', reputation: 200 },
-    ];
+  private async fetchUsersFromDatabase(): Promise<{ id: string; reputation: number }[]> {
+    return this.prisma.user.findMany({
+      select: {
+        id: true,
+        reputation: true,
+      },
+      orderBy: {
+        reputation: 'desc',
+      },
+    });
   }
 }
