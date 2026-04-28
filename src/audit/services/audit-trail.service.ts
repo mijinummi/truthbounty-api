@@ -36,7 +36,7 @@ export class AuditTrailService {
   /**
    * Log an action to the audit trail
    */
-  async log(input: AuditLogInput): Promise<AuditLog> {
+  async log(input: AuditLogInput): Promise<void> {
     try {
       const auditLog = this.auditLogRepo.create({
         actionType: input.actionType,
@@ -53,15 +53,13 @@ export class AuditTrailService {
         userAgent: this.request?.get('user-agent'),
       });
 
-      const saved = await this.auditLogRepo.save(auditLog);
+      await this.auditLogRepo.save(auditLog);
       this.logger.debug(
         `Audit logged: ${input.actionType} on ${input.entityType} ${input.entityId}`,
       );
-      return saved;
     } catch (error) {
       this.logger.error(`Failed to log audit: ${error.message}`, error.stack);
       // Don't throw - audit logging should not break the application
-      throw error;
     }
   }
 
@@ -297,5 +295,14 @@ export class AuditTrailService {
     });
 
     return changes;
+  }
+
+  public async getAuditLogsByCorrelationId(
+    correlationId: string
+  ): Promise<AuditLog[]> {
+    return this.auditLogRepo.find({
+      where: { correlationId },
+      order: { createdAt: 'ASC' },
+    });
   }
 }

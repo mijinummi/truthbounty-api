@@ -80,22 +80,36 @@ export class ReorgDetectorService {
    * Find the exact divergence point in the chain
    */
   private async findDivergencePoint(currentBlock: BlockInfo): Promise<number> {
-    let divergenceDepth = 1;
-    let checkBlockNumber = currentBlock.number - 1;
+    let divergenceDepth = 0;
+    let checkBlockNumber = currentBlock.number;
 
     // Walk backwards through the chain to find where it diverges
+    // We compare the expected hash in our current chain at each depth
+    // with the canonical block at that height
     while (checkBlockNumber > 0 && divergenceDepth <= 1000) {
       const canonicalBlock = await this.stateService.getCanonicalBlock(
         checkBlockNumber,
       );
 
-      if (canonicalBlock && canonicalBlock.blockHash !== currentBlock.parentHash) {
-        // Keep checking
+      // Calculate what the block hash should be at this depth in our current chain
+      let expectedHash: string;
+      if (divergenceDepth === 0) {
+        // At depth 0, we're looking at the current block itself
+        expectedHash = currentBlock.hash;
+      } else {
+        // For depth > 0, we need to get the ancestor at this depth
+        expectedHash = await this.getAncestorHashAtDepth(currentBlock, divergenceDepth);
+      }
+
+      // If we don't have a canonical block at this height, or the hashes don't match,
+      // we've found the divergence point (the first block where they don't match)
+      if (!canonicalBlock || canonicalBlock.blockHash !== expectedHash) {
+        // Found the point where chains diverge
+        break;
+      } else {
+        // Chains still match, go deeper (check next block back)
         divergenceDepth++;
         checkBlockNumber--;
-      } else {
-        // Found the point where chains match
-        break;
       }
     }
 
@@ -103,8 +117,38 @@ export class ReorgDetectorService {
   }
 
   /**
-   * Get all events affected by reorg
+   * Get the hash of the ancestor at a specific depth from the current block
+   * @param currentBlock The current block to start from
+   * @param depth How many blocks back to go (0 = current block, 1 = parent, 2 = grandparent, etc.)
+   * @returns The hash of the ancestor at the specified depth
    */
+  private async getAncestorHashAtDepth(currentBlock: BlockInfo, depth: number): Promise<string> {
+    if (depth < 0) {
+      throw new Error('Depth must be >= 0');
+    }
+    
+    // For depth 0, we're at the current block
+    if (depth === 0) {
+      return currentBlock.hash;
+    }
+    
+    // Start with the current block
+    let hash = currentBlock.hash;
+    let currentDepth = 0;
+    
+    // Traverse back 'depth' times to get the ancestor at that depth
+    while (currentDepth < depth) {
+      const block = await this.stateService.getCanonicalBlockByHash(hash);
+      if (!block) {
+        // If we can't find the block, return empty string to force mismatch
+        return '';
+      }
+      hash = block.parentHash;
+      currentDepth++;
+    }
+    
+    return hash;
+  }
   private async getAffectedEvents(
     startBlock: number,
     endBlock: number,
