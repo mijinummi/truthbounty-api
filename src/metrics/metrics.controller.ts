@@ -1,8 +1,10 @@
-import { Controller, Get, Res } from "@nestjs/common";
+import { Controller, Get, Res, UseGuards } from "@nestjs/common";
 import { Response } from "express";
 import { MetricsService } from "./metrics.service";
+import { MetricsAuthGuard } from "./metrics-auth.guard";
 
 @Controller("metrics")
+@UseGuards(MetricsAuthGuard)
 export class MetricsController {
   constructor(private readonly service: MetricsService) {}
 

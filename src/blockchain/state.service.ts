@@ -73,6 +73,19 @@ export class BlockchainStateService {
   }
 
   /**
+   * Get the canonical block by its hash
+   */
+  async getCanonicalBlockByHash(blockHash: string): Promise<BlockRecord | null> {
+    // Search through all blocks to find one with matching hash that is canonical
+    for (const [, block] of this.blocks) {
+      if (block.blockHash === blockHash && block.isCanonical) {
+        return block;
+      }
+    }
+    return null;
+  }
+
+  /**
    * Store a pending event
    */
   async savePendingEvent(event: PendingEvent): Promise<void> {
