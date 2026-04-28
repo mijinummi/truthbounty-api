@@ -3,7 +3,11 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { REQUEST } from '@nestjs/core';
 import { Request } from 'express';
-import { AuditLog, AuditActionType, AuditEntityType } from '../entities/audit-log.entity';
+import {
+  AuditLog,
+  AuditActionType,
+  AuditEntityType,
+} from '../entities/audit-log.entity';
 
 export interface AuditLogInput {
   actionType: AuditActionType;
@@ -54,10 +58,7 @@ export class AuditTrailService {
         `Audit logged: ${input.actionType} on ${input.entityType} ${input.entityId}`,
       );
     } catch (error) {
-      this.logger.error(
-        `Failed to log audit: ${error.message}`,
-        error.stack,
-      );
+      this.logger.error(`Failed to log audit: ${error.message}`, error.stack);
       // Don't throw - audit logging should not break the application
     }
   }
@@ -127,7 +128,8 @@ export class AuditTrailService {
     limit = 100,
     offset = 0,
   ): Promise<{ logs: AuditLog[]; total: number }> {
-    const query = this.auditLogRepo.createQueryBuilder('audit')
+    const query = this.auditLogRepo
+      .createQueryBuilder('audit')
       .leftJoinAndSelect('audit.user', 'user')
       .orderBy('audit.createdAt', 'DESC');
 
@@ -169,7 +171,7 @@ export class AuditTrailService {
 
     // Manual filtering for date range (TypeORM SQLite limitation)
     const filteredLogs = logs.filter(
-      log => log.createdAt >= startDate && log.createdAt <= endDate
+      (log) => log.createdAt >= startDate && log.createdAt <= endDate,
     );
 
     return { logs: filteredLogs, total: filteredLogs.length };
@@ -182,7 +184,8 @@ export class AuditTrailService {
     entityType?: AuditEntityType,
     days = 7,
   ): Promise<Record<string, number>> {
-    const query = this.auditLogRepo.createQueryBuilder('audit')
+    const query = this.auditLogRepo
+      .createQueryBuilder('audit')
       .select('audit.actionType', 'actionType')
       .addSelect('COUNT(*)', 'count')
       .groupBy('audit.actionType');
@@ -198,7 +201,7 @@ export class AuditTrailService {
     const results = await query.getRawMany();
 
     const summary: Record<string, number> = {};
-    results.forEach(r => {
+    results.forEach((r) => {
       summary[r.actionType] = parseInt(r.count, 10);
     });
 
@@ -211,15 +214,17 @@ export class AuditTrailService {
   async getChangeHistory(
     entityType: AuditEntityType,
     entityId: string,
-  ): Promise<Array<{
-    timestamp: Date;
-    action: AuditActionType;
-    userId: string;
-    changes: Record<string, { before: any; after: any }>;
-  }>> {
+  ): Promise<
+    Array<{
+      timestamp: Date;
+      action: AuditActionType;
+      userId: string;
+      changes: Record<string, { before: any; after: any }>;
+    }>
+  > {
     const logs = await this.getEntityAuditLogs(entityType, entityId);
 
-    return logs.map(log => ({
+    return logs.map((log) => ({
       timestamp: log.createdAt,
       action: log.actionType,
       userId: log.userId,
@@ -235,7 +240,8 @@ export class AuditTrailService {
     cutoffDate.setDate(cutoffDate.getDate() - daysToKeep);
 
     // Use raw query due to TypeORM SQLite limitations with date comparisons
-    const query = this.auditLogRepo.createQueryBuilder('audit')
+    const query = this.auditLogRepo
+      .createQueryBuilder('audit')
       .delete()
       .where('audit.createdAt < :cutoff', { cutoff: cutoffDate });
 
@@ -250,12 +256,9 @@ export class AuditTrailService {
   private getClientIp(): string | undefined {
     if (!this.request) return undefined;
 
-    return (
-      this.request.headers['x-forwarded-for'] as string ||
-      this.request.headers['cf-connecting-ip'] as string ||
-      this.request.ip ||
-      this.request.socket?.remoteAddress
-    );
+    // Use req.ip which respects trust proxy configuration
+    // Falls back to socket remoteAddress for direct connections
+    return this.request.ip || this.request.socket?.remoteAddress;
   }
 
   private getCorrelationId(): string {
@@ -282,7 +285,7 @@ export class AuditTrailService {
       ...Object.keys(afterState || {}),
     ]);
 
-    allKeys.forEach(key => {
+    allKeys.forEach((key) => {
       if (beforeState[key] !== afterState[key]) {
         changes[key] = {
           before: beforeState[key],
