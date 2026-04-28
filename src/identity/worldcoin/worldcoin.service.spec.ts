@@ -4,14 +4,12 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { WorldcoinService } from './worldcoin.service';
 import { WorldIdVerification } from './entities/world-id-verification.entity';
-import { verifyCloudProof } from '@worldcoin/minikit-js';
-
-jest.mock('@worldcoin/minikit-js');
 
 describe('WorldcoinService', () => {
   let service: WorldcoinService;
   let repository: jest.Mocked<Repository<WorldIdVerification>>;
   let configService: jest.Mocked<ConfigService>;
+  let fetchMock: jest.Mock;
 
   const mockRepository = {
     findOne: jest.fn(),
@@ -41,18 +39,24 @@ describe('WorldcoinService', () => {
     service = module.get<WorldcoinService>(WorldcoinService);
     repository = module.get(getRepositoryToken(WorldIdVerification));
     configService = module.get(ConfigService);
+    fetchMock = jest.fn();
+    global.fetch = fetchMock as typeof fetch;
 
     // Setup default config values
     configService.get.mockImplementation((key: string) => {
       const config = {
         'WORLDCOIN_APP_ID': 'test-app-id',
         'WORLDCOIN_ACTION': 'test-action',
+        'WORLDCOIN_VERIFY_BASE_URL': 'https://developer.worldcoin.org/api/v2/verify',
       };
       return config[key];
     });
 
-    // Mock verifyCloudProof to return success by default
-    (verifyCloudProof as jest.Mock).mockResolvedValue({ success: true });
+    fetchMock.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: jest.fn().mockResolvedValue({ success: true }),
+    });
   });
 
   it('should be defined', () => {
@@ -93,11 +97,19 @@ describe('WorldcoinService', () => {
       const result = await service.verifyProof(userId, verifyDto);
 
       expect(result).toEqual(mockVerification);
-      expect(verifyCloudProof).toHaveBeenCalledWith(
-        verifyDto.proof,
-        'app_test-app-id',
-        verifyDto.action,
-        verifyDto.signal,
+      expect(fetchMock).toHaveBeenCalledWith(
+        'https://developer.worldcoin.org/api/v2/verify/test-app-id',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            ...verifyDto.proof,
+            action: verifyDto.action,
+            signal: verifyDto.signal,
+          }),
+        },
       );
       expect(repository.findOne).toHaveBeenCalledWith({
         where: { nullifierHash: verifyDto.proof.nullifier_hash },
@@ -131,14 +143,30 @@ describe('WorldcoinService', () => {
     });
 
     it('should throw BadRequestException for invalid proof', async () => {
-      // Mock verifyCloudProof to return failure
-      (verifyCloudProof as jest.Mock).mockResolvedValue({ success: false });
+      fetchMock.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: jest.fn().mockResolvedValue({ success: false }),
+      });
 
       repository.findOne.mockResolvedValue(null);
 
       await expect(service.verifyProof(userId, verifyDto)).rejects.toThrow(
         'Invalid Worldcoin proof',
       );
+    });
+
+    it('should throw BadRequestException when the action does not match config', async () => {
+      repository.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.verifyProof(userId, {
+          ...verifyDto,
+          action: 'unexpected-action',
+        }),
+      ).rejects.toThrow('Invalid Worldcoin proof');
+
+      expect(fetchMock).not.toHaveBeenCalled();
     });
   });
 

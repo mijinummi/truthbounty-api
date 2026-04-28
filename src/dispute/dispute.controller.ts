@@ -9,29 +9,14 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { DisputeService } from './dispute.service';
+import { CreateDisputeDto } from './dto/create-dispute.dto';
+import { RejectDisputeDto } from './dto/reject-dispute.dto';
+import { ResolveDisputeDto } from './dto/resolve-dispute.dto';
 import {
   DisputeStatus,
   DisputeTrigger,
   DisputeOutcome,
 } from './entities/dispute.entity';
-
-class CreateDisputeDto {
-  claimId: string;
-  trigger: DisputeTrigger;
-  originalConfidence: number;
-  initiatorId?: string;
-  metadata?: Record<string, any>;
-}
-
-class ResolveDisputeDto {
-  outcome: DisputeOutcome;
-  finalConfidence: number;
-  metadata?: Record<string, any>;
-}
-
-class RejectDisputeDto {
-  reason: string;
-}
 
 @ApiTags('disputes')
 @Controller('disputes')
