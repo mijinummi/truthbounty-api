@@ -127,7 +127,8 @@ export class ClaimsService {
         claim.confidenceScore = confidenceScore;
 
         const updatedClaim = await this.claimRepo.save(claim);
-        await this.claimsCache.setClaim(claimId, updatedClaim);
+        // Invalidate both the claim-specific cache and the latest claims list cache
+        await this.claimsCache.invalidateClaim(claimId);
 
         // Log the resolution
         await this.auditTrailService.log({
@@ -154,7 +155,8 @@ export class ClaimsService {
 
         claim.finalized = true;
         const updatedClaim = await this.claimRepo.save(claim);
-        await this.claimsCache.setClaim(claimId, updatedClaim);
+        // Invalidate both the claim-specific cache and the latest claims list cache
+        await this.claimsCache.invalidateClaim(claimId);
 
         // Log the finalization
         await this.auditTrailService.log({
@@ -170,3 +172,4 @@ export class ClaimsService {
         return updatedClaim;
     }
 }
+

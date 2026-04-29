@@ -51,6 +51,7 @@ export class ClaimResolutionService {
     claim.finalized = true;
 
     const savedClaim = await this.claimRepo.save(claim);
+    // Invalidate both the claim-specific cache and the latest claims list cache
     await this.claimsCache.invalidateClaim(claimId);
     return savedClaim;
   }
