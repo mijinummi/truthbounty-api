@@ -4,12 +4,6 @@ import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import { WorldIdVerification } from './entities/world-id-verification.entity';
 
-// Placeholder for worldcoin verification (package to be installed separately)
-const verifyCloudProof = async (proof: any, action: string, signal?: string): Promise<boolean> => {
-  // TODO: Replace with actual Worldcoin SDK when available
-  return false;
-};
-
 export interface VerifyWorldcoinProofDto {
   proof: {
     merkle_root: string;
@@ -19,6 +13,10 @@ export interface VerifyWorldcoinProofDto {
   };
   action: string;
   signal?: string;
+}
+
+interface WorldcoinCloudVerifyResponse {
+  success?: boolean;
 }
 
 @Injectable()
@@ -65,28 +63,47 @@ export class WorldcoinService {
   }
 
   private async verifyWorldcoinProof(
-    proof: any,
+    proof: VerifyWorldcoinProofDto['proof'],
     action: string,
     signal?: string,
   ): Promise<boolean> {
     try {
       const appId = this.configService.get<string>('WORLDCOIN_APP_ID');
       const expectedAction = this.configService.get<string>('WORLDCOIN_ACTION');
+      const verifyBaseUrl =
+        this.configService.get<string>('WORLDCOIN_VERIFY_BASE_URL') ??
+        'https://developer.worldcoin.org/api/v2/verify';
 
       if (!appId || !expectedAction) {
         this.logger.error('Worldcoin configuration missing');
         return false;
       }
 
-      // Placeholder: verify proof using Worldcoin SDK when available
-      // For now, just log and return true if basic validation passes
-      this.logger.debug(`Verifying Worldcoin proof for action: ${expectedAction}`);
-      
-      // TODO: Integrate actual @worldcoin/minikit-js SDK when available
-      // const result = await verifyCloudProof(proof, appId, action, signal);
-      // return result.success;
+      if (action !== expectedAction) {
+        this.logger.warn(`Worldcoin action mismatch: received ${action}, expected ${expectedAction}`);
+        return false;
+      }
 
-      return true;
+      const response = await fetch(`${verifyBaseUrl}/${appId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ...proof,
+          action,
+          ...(signal ? { signal } : {}),
+        }),
+      });
+
+      if (!response.ok) {
+        this.logger.warn(`Worldcoin verification request failed with status ${response.status}`);
+        return false;
+      }
+
+      const result = (await response.json()) as WorldcoinCloudVerifyResponse;
+
+      return result.success === true;
     } catch (error) {
       this.logger.error('Error verifying Worldcoin proof:', error);
       return false;
