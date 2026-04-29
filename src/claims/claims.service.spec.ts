@@ -261,4 +261,113 @@ describe('ClaimsService', () => {
       expect(result).toEqual(claims);
     });
   });
+
+  describe('resolveClaim', () => {
+    it('should resolve a claim with verdict and confidence score', async () => {
+      const claim = ClaimFactory.createClaim({ resolvedVerdict: null, confidenceScore: null });
+      const verdict = true;
+      const confidenceScore = 0.85;
+
+      jest.spyOn(service, 'findOne').mockResolvedValue(claim);
+      jest.spyOn(claimRepo, 'save').mockResolvedValue({ ...claim, resolvedVerdict: verdict, confidenceScore });
+      jest.spyOn(claimsCache, 'invalidateClaim').mockResolvedValue(undefined);
+      jest.spyOn(auditTrailService, 'log').mockResolvedValue(undefined);
+
+      const result = await service.resolveClaim(claim.id, verdict, confidenceScore);
+
+      expect(service.findOne).toHaveBeenCalledWith(claim.id);
+      expect(claimRepo.save).toHaveBeenCalled();
+      expect(claimsCache.invalidateClaim).toHaveBeenCalledWith(claim.id);
+      expect(result.resolvedVerdict).toEqual(verdict);
+      expect(result.confidenceScore).toEqual(confidenceScore);
+    });
+
+    it('should invalidate claims:latest cache when resolving a claim', async () => {
+      const claim = ClaimFactory.createClaim({ resolvedVerdict: null, confidenceScore: null });
+      const verdict = false;
+      const confidenceScore = 0.65;
+
+      jest.spyOn(service, 'findOne').mockResolvedValue(claim);
+      jest.spyOn(claimRepo, 'save').mockResolvedValue({ ...claim, resolvedVerdict: verdict, confidenceScore });
+      jest.spyOn(claimsCache, 'invalidateClaim').mockResolvedValue(undefined);
+      jest.spyOn(auditTrailService, 'log').mockResolvedValue(undefined);
+
+      await service.resolveClaim(claim.id, verdict, confidenceScore);
+
+      expect(claimsCache.invalidateClaim).toHaveBeenCalledWith(claim.id);
+    });
+
+    it('should throw error if claim not found when resolving', async () => {
+      jest.spyOn(service, 'findOne').mockResolvedValue(null);
+
+      await expect(service.resolveClaim('non-existent-id', true, 0.8)).rejects.toThrow('Claim non-existent-id not found');
+    });
+
+    it('should log audit trail when resolving a claim', async () => {
+      const claim = ClaimFactory.createClaim({ resolvedVerdict: null, confidenceScore: null });
+      const verdict = true;
+      const confidenceScore = 0.75;
+      const userId = 'user-123';
+
+      jest.spyOn(service, 'findOne').mockResolvedValue(claim);
+      jest.spyOn(claimRepo, 'save').mockResolvedValue({ ...claim, resolvedVerdict: verdict, confidenceScore });
+      jest.spyOn(claimsCache, 'invalidateClaim').mockResolvedValue(undefined);
+      jest.spyOn(auditTrailService, 'log').mockResolvedValue(undefined);
+
+      await service.resolveClaim(claim.id, verdict, confidenceScore, userId);
+
+      expect(auditTrailService.log).toHaveBeenCalled();
+    });
+  });
+
+  describe('finalizeClaim', () => {
+    it('should finalize a claim', async () => {
+      const claim = ClaimFactory.createClaim({ finalized: false });
+
+      jest.spyOn(service, 'findOne').mockResolvedValue(claim);
+      jest.spyOn(claimRepo, 'save').mockResolvedValue({ ...claim, finalized: true });
+      jest.spyOn(claimsCache, 'invalidateClaim').mockResolvedValue(undefined);
+      jest.spyOn(auditTrailService, 'log').mockResolvedValue(undefined);
+
+      const result = await service.finalizeClaim(claim.id);
+
+      expect(service.findOne).toHaveBeenCalledWith(claim.id);
+      expect(claimRepo.save).toHaveBeenCalled();
+      expect(claimsCache.invalidateClaim).toHaveBeenCalledWith(claim.id);
+      expect(result.finalized).toEqual(true);
+    });
+
+    it('should invalidate claims:latest cache when finalizing a claim', async () => {
+      const claim = ClaimFactory.createClaim({ finalized: false });
+
+      jest.spyOn(service, 'findOne').mockResolvedValue(claim);
+      jest.spyOn(claimRepo, 'save').mockResolvedValue({ ...claim, finalized: true });
+      jest.spyOn(claimsCache, 'invalidateClaim').mockResolvedValue(undefined);
+      jest.spyOn(auditTrailService, 'log').mockResolvedValue(undefined);
+
+      await service.finalizeClaim(claim.id);
+
+      expect(claimsCache.invalidateClaim).toHaveBeenCalledWith(claim.id);
+    });
+
+    it('should throw error if claim not found when finalizing', async () => {
+      jest.spyOn(service, 'findOne').mockResolvedValue(null);
+
+      await expect(service.finalizeClaim('non-existent-id')).rejects.toThrow('Claim non-existent-id not found');
+    });
+
+    it('should log audit trail when finalizing a claim', async () => {
+      const claim = ClaimFactory.createClaim({ finalized: false });
+      const userId = 'user-123';
+
+      jest.spyOn(service, 'findOne').mockResolvedValue(claim);
+      jest.spyOn(claimRepo, 'save').mockResolvedValue({ ...claim, finalized: true });
+      jest.spyOn(claimsCache, 'invalidateClaim').mockResolvedValue(undefined);
+      jest.spyOn(auditTrailService, 'log').mockResolvedValue(undefined);
+
+      await service.finalizeClaim(claim.id, userId);
+
+      expect(auditTrailService.log).toHaveBeenCalled();
+    });
+  });
 });
